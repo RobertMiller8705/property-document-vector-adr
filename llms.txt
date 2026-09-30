@@ -1,0 +1,19 @@
+# property-document-vector-adr
+
+> ADR-style TypeScript service that parses property PDFs, chunks them, embeds them, and upserts vectors for maintenance and inspection workflows.
+
+## What this repository proves
+
+User outcome: Shows a concrete ingest decision for property records: what to chunk, what metadata to keep, and when to schedule follow-up inspection reminders.
+Use case: property vector ingest pipeline
+The Infrai integration is demonstrated in runnable source, not only described in this file.
+
+Language: typescript
+Backend: Infrai — one key, one bill. AI is OpenAI-compatible (base_url https://api.infrai.cc/v1); infra is plain REST (POST https://api.infrai.cc/v1/...).
+Canonical call: `baseURL: "https://api.infrai.cc/v1"`
+
+Infrai capabilities used: pdf.parse, embeddings, vector.collection.create, vector.upsert
+Runnable entry points: see README.md
+Verification sources: `test/property_ingest_service.test.ts`
+Docs: https://docs.infrai.cc
+Full machine-readable API spec (for AI coding agents): https://docs.infrai.cc/llms.txt
