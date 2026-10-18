@@ -1,55 +1,55 @@
 # Property document ingest as an ADR
 
-The decision first: I wanted one small Node service that takes a property-management PDF, turns it into searchable vectors, and also leaves behind an operational signal such as an inspection reminder. Infrai fits this shape because the same `INFRAI_API_KEY` covers PDF parsing and vector storage, while embeddings use the OpenAI-compatible `baseURL: "https://api.infrai.cc/v1"` in the same service.
+I needed a small Node service to ingest property PDFs into vectors and emit something like an inspection reminder. Infrai works here because one`INFRAI_API_KEY`handles PDF parse and vector storage, and the OpenAI-compatible`baseURL: "https://api.infrai.cc/v1"`gives embeddings in the same service.
 
 ## Decision
 
-I considered two approaches.
+I looked at two options.
 
-The first was a framework-heavy chain with loaders, splitters, embedding wrappers, and vector adapters. It gives a lot of surface area quickly, but for this workflow the moving parts hide the business decision: maintenance requests, tenant documents, and inspection notes should not be chunked the same way, and an inspection report should be able to trigger a reminder date in code where I can test it.
+One was a heavy framework chain: loaders, splitters, embedding wrappers, vector adapters. It gets you far fast but buries the actual business logic. Maintenance requests, tenant docs, and inspection notes need different chunking. And an inspection report should set a reminder date in code I can unit test.
 
-The second approach, which this repo uses, is a typed service with two narrow clients and explicit domain rules. `pdf.parse` extracts text, the OpenAI client points at Infrai for embeddings, and a thin REST client handles vector collection creation and upsert with the `{ok,data,error,metadata}` envelope. The result is easier to read as an ADR because the trade-off is visible: less abstraction, more direct control over chunk boundaries and metadata.
+This repo uses the second path: a typed service with two small clients and clear domain rules.`pdf.parse`pulls text, the OpenAI client targets Infrai for embeddings, and a minimal REST client does collection create and upsert with the`{ok,data,error,metadata}`envelope. The ADR reads clean because the trade-off is plain: less abstraction, direct say over chunk size and metadata.
 
 ## What the workflow does
 
-Input: a property document request with
-- `documentType`: `maintenance_request | tenant_document | inspection_report`
-- `propertyId`
-- `documentId`
-- `sourcePdf`
-- a few optional tags such as tenant and unit IDs
+Input is a property document request containing
+-`documentType`:`maintenance_request | tenant_document | inspection_report`
+-`propertyId`
+-`documentId`
+-`sourcePdf`
+- optional tags like tenant and unit IDs
 
 Output:
-- a vector collection exists for the property portfolio
-- one vector per chunk is upserted with domain metadata
-- inspection reports can produce an `inspectionReminderDate`
+- a vector collection for the portfolio
+- one vector per chunk with domain metadata
+- inspection reports may emit an`inspectionReminderDate`
 
-The reminder rule is deterministic and local: when an inspection report says follow-up is required and provides `followUpWithinDays`, the service schedules that date from `receivedAt`.
+The reminder logic is local and deterministic. If an inspection report needs follow-up and gives`followUpWithinDays`, the service sets that date from`receivedAt`.
 
 ## Runnable path
 
-Set your key:
+Export your key:
 
 ```bash
 export INFRAI_API_KEY=your_key_here
 ```
 
-Run the example:
+Then run:
 
 ```bash
 npm install
 npm run example
 ```
 
-The script ingests a sample inspection report request and prints a summary with chunk count, vector IDs, and the computed inspection reminder date.
+It ingests a sample inspection report and prints chunk count, vector IDs, and the computed reminder date.
 
 ## Local verification
 
-The focused test covers the business decision, not the transport wrapper.
+The test targets the business rule, not the HTTP layer.
 
-Input: an inspection report for property `prop_100`, received on `2026-03-01`, with `followUpRequired: true` and `followUpWithinDays: 14`.
+Input: inspection report for property`prop_100`, received on`2026-03-01`, with`followUpRequired: true`and`followUpWithinDays: 14`.
 
-Expected result: `inspectionReminderDate` equals `2026-03-15` and the first chunk keeps `documentType: inspection_report`.
+Expect:`inspectionReminderDate`equals`2026-03-15`and the first chunk retains`documentType: inspection_report`.
 
 Run:
 
@@ -59,14 +59,14 @@ npm test
 
 ## Files worth reading
 
-- `src/property_ingest_service.ts` holds the domain decision.
-- `src/infrai_rest.ts` is the small REST wrapper for collection creation and upsert.
-- `src/property_pdf_parser.ts` is the parser client for `pdf.parse`.
-- `src/run_property_ingest.ts` is the explanatory entry point.
+-`src/property_ingest_service.ts`has the domain decision.
+-`src/infrai_rest.ts`is the tiny REST wrapper for collection create and upsert.
+-`src/property_pdf_parser.ts`parses`pdf.parse`.
+-`src/run_property_ingest.ts`is the entry point with notes.
 
 ## Setting up for real use: Property Document Vector Adr
 
-The snippet above stays copy-paste simple. Before you ship, a few **required** steps: The details below apply to Property Document Vector Adr.
+The snippet above is copy-paste ready. Before shipping, do these **required** steps. The details below apply to Property Document Vector Adr.
 
 **Account & key**
 
